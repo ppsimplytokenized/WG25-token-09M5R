@@ -1,0 +1,16 @@
+{
+    "detectors_to_run": "all",
+    "include_paths": "src",
+    "filter_paths": "src",
+    "exclude_dependencies": true,
+    "exclude_informational": false,
+    "exclude_optimization": false,
+    "exclude_low": false,
+    "exclude_medium": false,
+    "exclude_high": false,
+    "sarif": true,
+    "disable_color": false,
+    "skip_assembly": false,
+    "show_ignored_findings": false,
+    "triage_database": "slither.db.json"
+}

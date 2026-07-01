@@ -1,0 +1,24 @@
+# Compiler files
+cache/
+out/
+lib/
+
+# Ignores development broadcast logs
+!/broadcast
+/broadcast/*/31337/
+/broadcast/*/43113/
+/broadcast/*/11155111/
+/broadcast/**/dry-run/
+
+# Docs
+docs/
+
+# Dotenv file
+.env
+
+.claude/
+build/
+node_modules/
+
+# macOS
+.DS_Store
