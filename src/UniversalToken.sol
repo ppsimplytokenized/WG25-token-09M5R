@@ -57,7 +57,8 @@ contract UniversalToken is
     // External Functions
     ///////////////////
 
-    /// @notice Wrapps ERC20Upgradeable._mint
+    /// @notice Wrapps ERC20Upgradeable._mint. Minting to a blocked account is
+    /// permitted; the minted tokens stay frozen until the account is unblocked.
     function mint(address to, uint256 amount) public onlyRole(MINTER_ROLE) {
         _mint(to, amount);
     }

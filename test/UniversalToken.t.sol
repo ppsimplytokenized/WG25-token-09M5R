@@ -146,6 +146,34 @@ contract UniversalTokenTest is Test {
         );
     }
 
+    function testMintToBlockedUser() public {
+        vm.prank(freezer);
+        token.blockUserPermanent(user);
+
+        vm.prank(minter);
+        token.mint(user, 10 * ONE_TOKEN);
+        assertEq(token.balanceOf(user), 10 * ONE_TOKEN, "mint credits blocked account");
+    }
+
+    function testMintedTokensStayFrozenUntilUnblocked() public {
+        vm.prank(freezer);
+        token.blockUserPermanent(user);
+        vm.prank(minter);
+        token.mint(user, 10 * ONE_TOKEN);
+
+        // still blocked: cannot send
+        vm.expectRevert(abi.encodeWithSelector(ERC20BlocklistUpgradeable.ERC20Blocked.selector, user));
+        vm.prank(user);
+        token.transfer(anon, 1 * ONE_TOKEN);
+
+        // after unblock the balance is usable
+        vm.prank(freezer);
+        token.unblockUser(user);
+        vm.prank(user);
+        token.transfer(anon, 1 * ONE_TOKEN);
+        assertEq(token.balanceOf(anon), 1 * ONE_TOKEN);
+    }
+
     /*##################################################################################*/
     /*################################# PAUSE/UNPAUSE ##################################*/
     /*##################################################################################*/
@@ -307,6 +335,169 @@ contract UniversalTokenTest is Test {
         vm.prank(user);
         token.approve(anon, 1 * ONE_TOKEN);
         assertEq(token.allowance(user, anon), 1 * ONE_TOKEN);
+    }
+
+    function testCannotBlockZeroAddress() public {
+        vm.prank(freezer);
+        vm.expectRevert(
+            abi.encodeWithSelector(ERC20BlocklistUpgradeable.ERC20BlocklistInvalidUser.selector, address(0))
+        );
+        token.blockUserPermanent(address(0));
+        assertFalse(token.blocked(address(0)));
+
+        // mint & burn keep working
+        vm.prank(minter);
+        token.mint(user, 10 * ONE_TOKEN);
+        assertEq(token.balanceOf(user), 10 * ONE_TOKEN);
+
+        bytes32 minterRole = token.MINTER_ROLE();
+        vm.prank(admin);
+        token.grantRole(minterRole, user);
+
+        vm.prank(user);
+        token.burn(4 * ONE_TOKEN);
+        assertEq(token.balanceOf(user), 6 * ONE_TOKEN);
+    }
+
+    function testBlockedSpenderCannotTransferFrom() public {
+        address owner = makeAddr("owner");
+        address spender = makeAddr("spender");
+        address dest = makeAddr("dest");
+
+        vm.prank(minter);
+        token.mint(owner, 100 * ONE_TOKEN);
+
+        vm.prank(owner);
+        token.approve(spender, 100 * ONE_TOKEN);
+
+        // block the spender AFTER the allowance already exists
+        vm.prank(freezer);
+        token.blockUserPermanent(spender);
+
+        vm.expectRevert(abi.encodeWithSelector(ERC20BlocklistUpgradeable.ERC20Blocked.selector, spender));
+        vm.prank(spender);
+        token.transferFrom(owner, dest, 40 * ONE_TOKEN);
+
+        assertEq(token.balanceOf(dest), 0, "blocked spender must not move funds");
+        assertEq(token.balanceOf(owner), 100 * ONE_TOKEN);
+    }
+
+    function testUnblockedSpenderCanTransferFrom() public {
+        address owner = makeAddr("owner2");
+        address spender = makeAddr("spender2");
+        address dest = makeAddr("dest2");
+
+        vm.prank(minter);
+        token.mint(owner, 100 * ONE_TOKEN);
+        vm.prank(owner);
+        token.approve(spender, 100 * ONE_TOKEN);
+
+        vm.prank(spender);
+        token.transferFrom(owner, dest, 40 * ONE_TOKEN);
+        assertEq(token.balanceOf(dest), 40 * ONE_TOKEN);
+    }
+
+    function testCannotApproveBlockedSpender() public {
+        address owner = makeAddr("owner3");
+        address spender = makeAddr("spender3");
+
+        vm.prank(freezer);
+        token.blockUserPermanent(spender);
+
+        vm.expectRevert(abi.encodeWithSelector(ERC20BlocklistUpgradeable.ERC20Blocked.selector, spender));
+        vm.prank(owner);
+        token.approve(spender, 10 * ONE_TOKEN);
+    }
+
+    function testCanRevokeAllowanceToBlockedSpender() public {
+        address owner = makeAddr("owner4");
+        address spender = makeAddr("spender4");
+
+        // grant while unblocked
+        vm.prank(owner);
+        token.approve(spender, 10 * ONE_TOKEN);
+
+        // spender gets blocked
+        vm.prank(freezer);
+        token.blockUserPermanent(spender);
+
+        // owner can still revoke (value == 0)
+        vm.prank(owner);
+        token.approve(spender, 0);
+        assertEq(token.allowance(owner, spender), 0);
+    }
+
+    /*##################################################################################*/
+    /*################################## FORCE BURN ####################################*/
+    /*##################################################################################*/
+
+    function testForceBurnSeizesBlockedFunds() public {
+        vm.prank(minter);
+        token.mint(user, 100 * ONE_TOKEN);
+
+        vm.prank(freezer);
+        token.blockUserPermanent(user);
+
+        uint256 supplyBefore = token.totalSupply();
+
+        vm.prank(freezer);
+        token.forceBurn(user, 100 * ONE_TOKEN);
+
+        assertEq(token.balanceOf(user), 0, "blocked funds seized");
+        assertEq(token.totalSupply(), supplyBefore - 100 * ONE_TOKEN, "supply reduced");
+    }
+
+    function testForceBurnWorksWhilePaused() public {
+        vm.prank(minter);
+        token.mint(user, 100 * ONE_TOKEN);
+        vm.prank(freezer);
+        token.blockUserPermanent(user);
+
+        // pause the token (incident response)
+        vm.prank(pauser);
+        token.pause();
+        assertTrue(token.paused());
+
+        // seizure must still succeed despite the pause
+        vm.prank(freezer);
+        token.forceBurn(user, 100 * ONE_TOKEN);
+
+        assertEq(token.balanceOf(user), 0, "seizure works during pause");
+    }
+
+    function testForceBurnRevertsOnInsufficientBalance() public {
+        vm.prank(minter);
+        token.mint(user, 10 * ONE_TOKEN);
+        vm.prank(freezer);
+        token.blockUserPermanent(user);
+
+        // base _update balance check still enforced even on the direct path
+        vm.prank(freezer);
+        vm.expectRevert();
+        token.forceBurn(user, 50 * ONE_TOKEN);
+    }
+
+    function testForceBurnRequiresBlockedAccount() public {
+        vm.prank(minter);
+        token.mint(user, 100 * ONE_TOKEN);
+
+        vm.prank(freezer);
+        vm.expectRevert(abi.encodeWithSelector(UniversalToken.AccountNotBlocked.selector, user));
+        token.forceBurn(user, 50 * ONE_TOKEN);
+    }
+
+    function testOnlyFreezerCanForceBurn() public {
+        vm.prank(minter);
+        token.mint(user, 100 * ONE_TOKEN);
+        vm.prank(freezer);
+        token.blockUserPermanent(user);
+
+        bytes32 freezerRole = token.FREEZER_ROLE();
+        vm.prank(minter); // minter is not a freezer
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, minter, freezerRole)
+        );
+        token.forceBurn(user, 100 * ONE_TOKEN);
     }
 
     /*##################################################################################*/

@@ -105,14 +105,15 @@ abstract contract ERC20BlocklistUpgradeable is ERC20Upgradeable {
     /**
      * @dev See {ERC20-_update}.
      *
-     * A blocked account cannot send (`from`) or receive (`to`) tokens. Burns
-     * (`to == address(0)`) are intentionally allowed even when `from` is blocked so
-     * an authorized role can destroy/seize a blocked account's balance. The zero
-     * address can never be blocked (see {_blockUser}), so mints are unaffected.
+     * A blocked account cannot send (`from`) or receive (`to`) tokens via transfers.
+     * Burns (`to == address(0)`) are intentionally allowed even when `from` is blocked
+     * so an authorized role can destroy/seize a blocked account's balance, and mints
+     * (`from == address(0)`) are allowed to a blocked recipient so an authorized role
+     * can credit an account whose funds then remain frozen until it is unblocked.
      */
     function _update(address from, address to, uint256 value) internal virtual override {
         if (to != address(0) && blocked(from)) revert ERC20Blocked(from);
-        if (blocked(to)) revert ERC20Blocked(to);
+        if (from != address(0) && blocked(to)) revert ERC20Blocked(to);
         super._update(from, to, value);
     }
 

@@ -91,6 +91,24 @@ contract BlockTimeTest is BaseTokenTest {
         assertTrue(token.blocked(alice), "still blocked under the extended date");
     }
 
+    function test_MintToBlockedUser_UsableAfterExpiry() public {
+        token.blockUser(bob, block.timestamp + 30 days);
+
+        // minting to a blocked account is allowed; the balance stays frozen
+        token.mint(bob, 10 * ONE);
+        assertEq(token.balanceOf(bob), 10 * ONE);
+
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(ERC20BlocklistUpgradeable.ERC20Blocked.selector, bob));
+        token.transfer(alice, ONE);
+
+        // after the block expires the minted tokens are spendable
+        vm.warp(block.timestamp + 30 days);
+        vm.prank(bob);
+        token.transfer(alice, ONE);
+        assertEq(token.balanceOf(alice), 101 * ONE);
+    }
+
     function test_SeizureFailsAfterBlockExpires() public {
         token.blockUser(alice, block.timestamp + 30 days);
 
