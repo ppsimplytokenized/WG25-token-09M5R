@@ -12,17 +12,17 @@ import {
 import {
     ERC20PermitUpgradeable
 } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
-import {ERC20BlocklistUpgradeable} from "./ERC20BlocklistUpgradeable.sol";
+import {WG25_Blocklist} from "./WG25_Blocklist.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-contract UniversalToken is
+contract WG25_Token is
     Initializable,
     ERC20Upgradeable,
     ERC20BurnableUpgradeable,
     ERC20PausableUpgradeable,
     AccessControlUpgradeable,
     ERC20PermitUpgradeable,
-    ERC20BlocklistUpgradeable
+    WG25_Blocklist
 {
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
@@ -94,7 +94,7 @@ contract UniversalToken is
         _blockUser(user, BLOCKED_PERMANENT);
     }
 
-    /// @notice Wrapps ERC20BlocklistUpgradeable._unblockUser
+    /// @notice Wrapps WG25_Blocklist._unblockUser
     function unblockUser(address user) external onlyRole(FREEZER_ROLE) {
         _unblockUser(user);
     }
@@ -132,7 +132,7 @@ contract UniversalToken is
     /// @inheritdoc	ERC20Upgradeable
     function _update(address from, address to, uint256 value)
         internal
-        override(ERC20Upgradeable, ERC20PausableUpgradeable, ERC20BlocklistUpgradeable)
+        override(ERC20Upgradeable, ERC20PausableUpgradeable, WG25_Blocklist)
     {
         super._update(from, to, value);
     }
@@ -140,7 +140,7 @@ contract UniversalToken is
     /// @inheritdoc	ERC20Upgradeable
     function _approve(address owner, address spender, uint256 value, bool emitEvent)
         internal
-        override(ERC20Upgradeable, ERC20BlocklistUpgradeable)
+        override(ERC20Upgradeable, WG25_Blocklist)
     {
         super._approve(owner, spender, value, emitEvent);
     }

@@ -15,11 +15,11 @@ import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/
  * argument. Similarly, the account will be unblocked again if
  * {_unblockUser} is called.
  */
-abstract contract ERC20BlocklistUpgradeable is ERC20Upgradeable {
+abstract contract WG25_Blocklist is ERC20Upgradeable {
     /// @dev Sentinel `blockedUntil` value meaning the block never expires.
     uint256 internal constant BLOCKED_PERMANENT = type(uint256).max;
 
-    /// @custom:storage-location erc7201:ERC20BlocklistUpgradeable.storage
+    /// @custom:storage-location erc7201:WG25_Blocklist.storage
     struct ERC20BlocklistUpgradeableStorage {
         /**
          * @dev Timestamp until which an address is blocked. A user is blocked while
@@ -29,7 +29,7 @@ abstract contract ERC20BlocklistUpgradeable is ERC20Upgradeable {
         mapping(address user => uint256 blockedUntil) _blockedUntil;
     }
 
-    // keccak256(abi.encode(uint256(keccak256("ERC20BlocklistUpgradeable.storage")) - 1)) & ~bytes32(uint256(0xff))
+    // keccak256(abi.encode(uint256(keccak256("WG25_Blocklist.storage")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant ERC20BlocklistUpgradeableStorageLocation =
         0x943d6f0aae33a11bdac5b1e1fa272eeefbfbb201792466fc6e6bfcdac78e2f00;
 
